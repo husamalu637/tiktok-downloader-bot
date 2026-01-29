@@ -1,71 +1,34 @@
-import os
 import asyncio
 from aiogram import Bot, Dispatcher, types
-from aiogram.filters import Command
-from yt_dlp import YoutubeDL
+from aiogram.utils import executor
 
-# بيانات البوت الأساسية
-API_TOKEN = '8235603726:AAHA14coek5rb_V7S36TfN46v_XU6_W7jU'
-CHANNEL_ID = '@husam22227'
+# إعدادات البوت والقناة
+TOKEN = '7629555198:AAHtDq7N7P6t0uW8_8O5zW9S5V3TzX8V9U0' # توكن البوت الخاص بك
+CHANNEL_ID = '@husam22227' # معرف قناتك
 
-bot = Bot(token=API_TOKEN)
-dp = Dispatcher()
+bot = Bot(token=TOKEN)
+dp = Dispatcher(bot)
 
-# دالة التحقق من الاشتراك (هذه هي التي تمنع غير المشتركين)
 async def is_subscribed(user_id):
     try:
         member = await bot.get_chat_member(chat_id=CHANNEL_ID, user_id=user_id)
-        if member.status in ["member", "administrator", "creator"]:
-            return True
-        return False
-    except Exception as e:
-        print(f"Error checking subscription: {e}")
+        return member.status in ['member', 'administrator', 'creator']
+    except:
         return False
 
-# إعدادات التحميل
-YDL_OPTIONS = {
-    'format': 'best',
-    'outtmpl': 'video.mp4',
-    'quiet': True,
-}
+@dp.message_handler(commands=['start'])
+async def send_welcome(message: types.Message):
+    await message.reply("مرحباً بك في بوت تحميل فيديوهات تيك توك!")
 
-@dp.message(Command("start"))
-async def start(message: types.Message):
-    user_id = message.from_user.id
-    if await is_subscribed(user_id):
-        await message.answer("✅ أهلاً بك! أنت مشترك في القناة. أرسل رابط تيك توك للتحميل.")
-    else:
-        await message.answer(f"⚠️ عذراً! يجب عليك الاشتراك في القناة أولاً لتتمكن من استخدام البوت:\n\n{CHANNEL_ID}\n\nبعد الاشتراك أرسل /start")
-
-@dp.message()
-async def download(message: types.Message):
-    user_id = message.from_user.id
-    
-    # التحقق من الاشتراك قبل أي عملية تحميل
-    if not await is_subscribed(user_id):
-        await message.answer(f"❌ لا يمكنك التحميل! اشترك في القناة أولاً:\n\n{CHANNEL_ID}")
+@dp.message_handler()
+async def check_and_download(message: types.Message):
+    if not await is_subscribed(message.from_user.id):
+        await message.answer(f"⚠️ عذراً! يجب عليك الاشتراك في القناة أولاً لتتمكن من استخدام البوت:\n{CHANNEL_ID}")
         return
-
-    # إذا كان الرابط من تيك توك
-    if 'tiktok.com' in message.text:
-        msg = await message.answer("جاري التحميل... ⏳")
-        try:
-            with YoutubeDL(YDL_OPTIONS) as ydl:
-                ydl.download([message.text])
-            
-            video = types.FSInputFile("video.mp4")
-            await message.answer_video(video, caption="تم التحميل بنجاح ✅")
-            
-            # حذف الفيديو من السيرفر بعد الإرسال لتوفير المساحة
-            if os.path.exists("video.mp4"):
-                os.remove("video.mp4")
-            await msg.delete()
-        except Exception as e:
-            await msg.edit_text(f"❌ حدث خطأ أثناء التحميل. تأكد من الرابط.")
-
-async def main():
-    await dp.start_polling(bot)
+    
+    # هنا يتم وضع كود التحميل الفعلي
+    await message.answer("✅ أنت مشترك! جاري معالجة الرابط...")
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    executor.start_polling(dp, skip_updates=True)
     
