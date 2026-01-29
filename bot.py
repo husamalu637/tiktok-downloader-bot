@@ -10,15 +10,16 @@ dp = Dispatcher(bot)
 logging.basicConfig(level=logging.INFO)
 
 @dp.message_handler(commands=['start'])
-async def send_welcome(message: types.Message):
+async def start_command(message: types.Message):
     try:
         user = await bot.get_chat_member(chat_id=CHANNEL, user_id=message.from_user.id)
         if user.status in ['member', 'administrator', 'creator']:
-            await message.answer("✅ أهلاً بك! أنت مشترك في القناة.")
+            await message.answer("✅ أهلاً بك! أنت مشترك في القناة ويمكنك استخدام البوت.")
         else:
-            await message.answer(f"⚠️ يرجى الاشتراك في القناة أولاً لتتمكن من استخدام البوت:\n{CHANNEL}")
-    except Exception as e:
-        await message.answer("⚠️ حدث خطأ، تأكد من رفع البوت مسؤولاً في القناة.")
+            await message.answer(f"⚠️ يرجى الاشتراك في القناة أولاً:\nhttps://t.me/husam22227")
+    except:
+        await message.answer("⚠️ تأكد من رفع البوت مسؤولاً في القناة.")
 
 if __name__ == '__main__':
     executor.start_polling(dp, skip_updates=True)
+
