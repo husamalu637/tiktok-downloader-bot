@@ -1,14 +1,12 @@
-
 import os
 import logging
-import requests
+import aiohttp
 from aiogram import Bot, Dispatcher, executor, types
 
 logging.basicConfig(level=logging.INFO)
 
 API_TOKEN = os.getenv("BOT_TOKEN")
-# تأكد من كتابة معرف قناتك هنا بشكل صحيح
-CHANNEL_ID = "@YourChannel" 
+CHANNEL_ID = "@YourChannel" # استبدل بـ معرف قناتك
 CHANNEL_URL = f"https://t.me/{CHANNEL_ID.replace('@', '')}"
 
 bot = Bot(token=API_TOKEN)
@@ -25,10 +23,10 @@ async def is_subscribed(user_id):
 async def send_welcome(message: types.Message):
     check = await is_subscribed(message.from_user.id)
     if check:
-        await message.reply("✅ مستعد للعمل! أرسل رابط تيك توك الآن.")
+        await message.reply("✅ البوت جاهز! أرسل رابط تيك توك الآن.")
     else:
         keyboard = types.InlineKeyboardMarkup()
-        btn = types.InlineKeyboardButton("إضغط هنا للإشتراك في القناة 📢", url=CHANNEL_URL)
+        btn = types.InlineKeyboardButton("الإشتراك في القناة 📢", url=CHANNEL_URL)
         keyboard.add(btn)
         await message.reply(f"⚠️ يجب الاشتراك أولاً:\n{CHANNEL_ID}", reply_markup=keyboard)
 
@@ -40,21 +38,22 @@ async def handle_video(message: types.Message):
     
     url = message.text
     if "tiktok.com" in url:
-        msg = await message.answer("⏳ جاري التحميل... يرجى الانتظار")
+        msg = await message.answer("⏳ جاري التحميل...")
         try:
-            # استخدام محرك تحميل بديل وأكثر استقراراً
-            api_url = f"https://www.tikwm.com/api/?url={url}"
-            response = requests.get(api_url).json()
-            
-            if response.get('code') == 0:
-                video_url = "https://www.tikwm.com" + response['data']['play']
-                await message.answer_video(video_url, caption="✅ تم التحميل بواسطة بوتك!")
-                await msg.delete()
-            else:
-                await msg.edit_text("❌ فشل الجلب: الرابط قد يكون غير صحيح أو الفيديو خاص.")
+            # استخدام aiohttp وهي أخف وأسرع لسيرفر Koyeb
+            async with aiohttp.ClientSession() as session:
+                api_url = f"https://www.tikwm.com/api/?url={url}"
+                async with session.get(api_url) as resp:
+                    data = await resp.json()
+                    if data.get('code') == 0:
+                        video_url = "https://www.tikwm.com" + data['data']['play']
+                        await message.answer_video(video_url, caption="✅ تم التحميل!")
+                        await msg.delete()
+                    else:
+                        await msg.edit_text("❌ فشل الجلب: تأكد من أن الفيديو عام.")
         except Exception as e:
             logging.error(f"Error: {e}")
-            await msg.edit_text("❌ حدث خطأ فني، حاول مرة أخرى لاحقاً.")
+            await msg.edit_text("❌ حدث ضغط على السيرفر، حاول مجدداً بعد ثوانٍ.")
     else:
         await message.reply("⚠️ أرسل رابط تيك توك فقط.")
 
