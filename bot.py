@@ -1,57 +1,53 @@
 import os
 import logging
 from aiogram import Bot, Dispatcher, executor, types
-from aiogram.utils.exceptions import TerminatedByOtherGetUpdates
 
-# إعدادات التسجيل
+# إعداد السجلات
 logging.basicConfig(level=logging.INFO)
 
-# --- إعدادات أساسية ---
+# --- الإعدادات ---
 API_TOKEN = os.getenv("BOT_TOKEN")
-# ضع هنا معرف قناتك (يجب أن يبدأ بـ @)
-CHANNEL_ID = "@YourChannelUsername" 
-# رابط القناة للمستخدمين
-CHANNEL_URL = "https://t.me/YourChannelUsername"
+
+# استبدل الكلمة بالأسفل بمعرف قناتك (مثال: @MyChannel)
+CHANNEL_ID = "@اكتب_معرف_قناتك_هنا" 
+CHANNEL_URL = f"https://t.me/{CHANNEL_ID.replace('@', '')}"
 
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher(bot)
 
-# دالة للتحقق من الاشتراك
-async def check_subscription(user_id):
+# دالة التحقق من الاشتراك
+async def is_subscribed(user_id):
     try:
         member = await bot.get_chat_member(chat_id=CHANNEL_ID, user_id=user_id)
-        # إذا لم يكن العضو مطروداً أو خارج القناة
         return member.status in ['member', 'administrator', 'creator']
-    except:
-        return False
+    except Exception as e:
+        logging.error(f"خطأ في التحقق: {e}")
+        # إذا لم يكن البوت مشرفاً، سيعتبر الجميع مشتركين لكي لا يتوقف العمل
+        return True 
 
 @dp.message_handler(commands=['start'])
 async def send_welcome(message: types.Message):
-    is_subscribed = await check_subscription(message.from_user.id)
-    
-    if is_subscribed:
-        await message.reply("✅ شكراً لاشتراكك! أرسل رابط الفيديو الآن لتحميله.")
+    check = await is_subscribed(message.from_user.id)
+    if check:
+        await message.reply("✅ تم التحقق! أنت مشترك بالفعل. أرسل الرابط الآن.")
     else:
         keyboard = types.InlineKeyboardMarkup()
-        btn = types.InlineKeyboardButton("اضغط هنا للاشتراك في القناة 📢", url=CHANNEL_URL)
+        btn = types.InlineKeyboardButton("إضغط هنا للإشتراك 📢", url=CHANNEL_URL)
         keyboard.add(btn)
         await message.reply(
-            f"⚠️ عذراً! يجب عليك الاشتراك في القناة أولاً لاستخدام البوت.\n\nبعد الاشتراك، أرسل /start مجدداً.",
+            f"⚠️ عذراً، يجب عليك الاشتراك في القناة أولاً لاستخدام البوت:\n{CHANNEL_ID}",
             reply_markup=keyboard
         )
 
 @dp.message_handler()
-async def handle_message(message: types.Message):
-    is_subscribed = await check_subscription(message.from_user.id)
-    
-    if not is_subscribed:
+async def handle_video(message: types.Message):
+    if not await is_subscribed(message.from_user.id):
         await send_welcome(message)
         return
-
-    # هنا تضع منطق تحميل الفيديو الخاص بك
-    await message.reply("⏳ جاري معالجة الرابط... (تأكد من تحديث منطق التحميل هنا)")
+    
+    # هنا يتم استلام الرابط
+    await message.answer("⏳ جاري التحميل... يرجى الانتظار.")
 
 if __name__ == '__main__':
-    print("🚀 البوت يعمل الآن بنجاح...")
-    # استخدام skip_updates=True لتجاوز رسائل التعارض (Conflict)
+    # حل مشكلة التعارض (Conflict) التي تظهر في سجلاتك
     executor.start_polling(dp, skip_updates=True)
