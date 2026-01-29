@@ -1,4 +1,6 @@
+
 aiogram==2.24
 aiohttp==3.8.1
+yt-dlp
 
 
