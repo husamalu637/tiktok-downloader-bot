@@ -1,8 +1,8 @@
+
 import os
 import aiohttp
 from aiogram import Bot, Dispatcher, executor, types
 
-# إعدادات البوت والقناة
 API_TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL_ID = "@husam22227"
 CHANNEL_URL = "https://t.me/husam22227"
@@ -10,7 +10,6 @@ CHANNEL_URL = "https://t.me/husam22227"
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher(bot)
 
-# دالة التحقق (مبسطة جداً لعدم استهلاك الرام)
 async def is_sub(user_id):
     try:
         m = await bot.get_chat_member(CHANNEL_ID, user_id)
@@ -20,10 +19,10 @@ async def is_sub(user_id):
 @dp.message_handler(commands=['start'])
 async def start(message: types.Message):
     if await is_sub(message.from_user.id):
-        await message.reply("✅ أرسل رابط تيك توك الآن.")
+        await message.reply("✅ أهلاً بك! أرسل رابط تيك توك الآن.")
     else:
         kb = types.InlineKeyboardMarkup().add(types.InlineKeyboardButton("إشترك هنا 📢", url=CHANNEL_URL))
-        await message.reply(f"⚠️ اشترك أولاً في {CHANNEL_ID}", reply_markup=kb)
+        await message.reply(f"⚠️ اشترك أولاً في القناة لتتمكن من التحميل:\n{CHANNEL_ID}", reply_markup=kb)
 
 @dp.message_handler()
 async def download(message: types.Message):
@@ -32,20 +31,29 @@ async def download(message: types.Message):
 
     url = message.text
     if "tiktok.com" in url:
-        msg = await message.reply("⏳ جاري التحميل...")
+        msg = await message.reply("⏳ جاري جلب الفيديو...")
         try:
-            # الطريقة المباشرة التي نجحت معنا صباحاً
+            # استخدام محرك Tiklydown البديل (أكثر استقراراً حالياً)
             async with aiohttp.ClientSession() as session:
-                async with session.get(f"https://www.tikwm.com/api/?url={url}") as r:
+                async with session.get(f"https://api.tiklydown.eu.org/api/download?url={url}") as r:
                     res = await r.json()
-                    video = "https://www.tikwm.com" + res['data']['play']
-                    await message.answer_video(video, caption="✅ تم التحميل!")
+                    # استخراج الفيديو بدون علامة مائية
+                    video = res['result']['video']['noWatermark']
+                    await message.answer_video(video, caption="✅ تم التحميل بنجاح!")
                     await msg.delete()
         except:
-            await msg.edit_text("❌ جرب رابط آخر أو تأكد أن الفيديو عام.")
+            # محاولة أخيرة بمحرك Tikwm إذا فشل الأول
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(f"https://www.tikwm.com/api/?url={url}") as r:
+                        res = await r.json()
+                        video = "https://www.tikwm.com" + res['data']['play']
+                        await message.answer_video(video, caption="✅ تم التحميل (محرك 2)")
+                        await msg.delete()
+            except:
+                await msg.edit_text("❌ الخدمة مضغوطة حالياً، حاول مرة أخرى بعد قليل.")
     else:
-        await message.reply("⚠️ أرسل رابط تيك توك.")
+        await message.reply("⚠️ أرسل رابط تيك توك صحيح.")
 
 if __name__ == '__main__':
     executor.start_polling(dp, skip_updates=True)
-
