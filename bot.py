@@ -1,57 +1,53 @@
+import os
 import asyncio
-import requests
-from aiogram import Bot, Dispatcher, types
-from aiogram.filters import Command
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, MessageHandler, filters, ContextTypes
+import yt_dlp
 
-# التوكن الخاص بك
-API_TOKEN = "8235603726:AAHA14coek5rb90rLwO80vkDAMKaId2bw0g"
+# سيقوم السيرفر بقراءة التوكن من "Environment Variables"
+TOKEN = os.getenv("BOT_TOKEN") 
+CHANNEL_ID = '@husam22227'
 
-bot = Bot(token=API_TOKEN)
-dp = Dispatcher()
+def download_tiktok_sync(url):
+    ydl_opts = {
+        'format': 'best',
+        'outtmpl': 'video_%(id)s.mp4',
+        'quiet': True,
+        'no_warnings': True,
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=True)
+        return ydl.prepare_filename(info)
 
-HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+async def check_subscribe(user_id, context):
+    try:
+        member = await context.bot.get_chat_member(chat_id=CHANNEL_ID, user_id=user_id)
+        return member.status in ['creator', 'administrator', 'member']
+    except:
+        return False
 
-@dp.message(Command("start"))
-async def start(message: types.Message):
-    await message.reply("🚀 البوت يعمل بـ 3 محركات تحميل عالمية! أرسل الرابط.")
+async def handle_message(update, context):
+    user_id = update.effective_user.id
+    if not await check_subscribe(user_id, context):
+        keyboard = [[InlineKeyboardButton("اشترك هنا ✅", url=f"https://t.me/husam22227")]]
+        await update.message.reply_text("يجب الاشتراك أولاً!", reply_markup=InlineKeyboardMarkup(keyboard))
+        return
 
-@dp.message()
-async def download(message: types.Message):
-    url = message.text
-    if "tiktok.com" in url:
-        msg = await message.answer("⏳ جاري محاولة التحميل من 3 مصادر...")
-        
-        # --- المحرك 1: TikWM ---
+    if "tiktok.com" in update.message.text:
+        msg = await update.message.reply_text("⏳ جاري التحميل...")
         try:
-            res = requests.get(f"https://www.tikwm.com/api/?url={url}", headers=HEADERS, timeout=10).json()
-            if res.get('code') == 0:
-                return await message.answer_video("https://www.tikwm.com" + res['data']['play'], caption="✅ المصدر 1")
-        except: pass
+            file_path = await asyncio.to_thread(download_tiktok_sync, update.message.text)
+            with open(file_path, 'rb') as video:
+                await update.message.reply_video(video=video)
+            os.remove(file_path)
+            await msg.delete()
+        except Exception as e:
+            await msg.edit_text(f"خطأ: {e}")
 
-        # --- المحرك 2: Tiklydown ---
-        try:
-            res = requests.get(f"https://api.tiklydown.eu.org/api/download?url={url}", timeout=10).json()
-            video = res.get('result', {}).get('video', {}).get('noWatermark')
-            if video:
-                return await message.answer_video(video, caption="✅ المصدر 2")
-        except: pass
-
-        # --- المحرك 3: TTDL (المحرك السري) ---
-        try:
-            res = requests.get(f"https://api.vkrhost.com/api/tiktok?url={url}", timeout=10).json()
-            video = res.get('data', {}).get('video')
-            if video:
-                return await message.answer_video(video, caption="✅ المصدر 3")
-        except: pass
-
-        await msg.edit_text("❌ جميع المصادر محظورة حالياً في السيرفر. جرب رابطاً آخر أو انتظر قليلاً.")
-    else:
-        await message.reply("⚠️ أرسل رابط تيك توك صحيح.")
-
-async def main():
-    await bot.delete_webhook(drop_pending_updates=True)
-    await dp.start_polling(bot)
+def main():
+    app = Application.builder().token(TOKEN).build()
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app.run_polling()
 
 if __name__ == '__main__':
-    asyncio.run(main())
-    
+    main()
