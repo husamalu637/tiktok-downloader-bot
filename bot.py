@@ -1,23 +1,12 @@
 import os
 import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, MessageHandler, filters, ContextTypes
+from telegram.ext import Application, MessageHandler, CommandHandler, filters, ContextTypes
 import yt_dlp
 
-# سيقوم السيرفر بقراءة التوكن من "Environment Variables"
-TOKEN = os.getenv("BOT_TOKEN") 
+# الإعدادات
+TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL_ID = '@husam22227'
-
-def download_tiktok_sync(url):
-    ydl_opts = {
-        'format': 'best',
-        'outtmpl': 'video_%(id)s.mp4',
-        'quiet': True,
-        'no_warnings': True,
-    }
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=True)
-        return ydl.prepare_filename(info)
 
 async def check_subscribe(user_id, context):
     try:
@@ -26,27 +15,61 @@ async def check_subscribe(user_id, context):
     except:
         return False
 
-async def handle_message(update, context):
+# --- وظيفة الترحيب عند الضغط على Start ---
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_name = update.effective_user.first_name
+    await update.message.reply_text(
+        f"أهلاً بك يا {user_name} في بوت تحميل تيك توك! 📥\n\n"
+        "من فضلك، أرسل رابط الفيديو الآن وسأقوم بتحميله لك فوراً."
+    )
+
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+    user_text = update.message.text
+    
+    # التحقق من الاشتراك
     if not await check_subscribe(user_id, context):
-        keyboard = [[InlineKeyboardButton("اشترك هنا ✅", url=f"https://t.me/husam22227")]]
-        await update.message.reply_text("يجب الاشتراك أولاً!", reply_markup=InlineKeyboardMarkup(keyboard))
+        keyboard = [[InlineKeyboardButton("اضغط هنا للاشتراك في القناة ✅", url=f"https://t.me/husam22227")]]
+        await update.message.reply_text(
+            "⚠️ عذراً، يجب عليك الاشتراك في القناة أولاً لاستخدام البوت.",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
         return
 
-    if "tiktok.com" in update.message.text:
-        msg = await update.message.reply_text("⏳ جاري التحميل...")
+    # معالجة الرابط
+    if "tiktok.com" in user_text:
+        msg = await update.message.reply_text("⏳ جاري معالجة الفيديو، انتظر قليلاً...")
         try:
-            file_path = await asyncio.to_thread(download_tiktok_sync, update.message.text)
+            # دالة التحميل (نفس التي استخدمناها سابقاً)
+            loop = asyncio.get_event_loop()
+            file_path = await loop.run_in_executor(None, lambda: download_tiktok_sync(user_text))
+            
             with open(file_path, 'rb') as video:
-                await update.message.reply_video(video=video)
+                await update.message.reply_video(video=video, caption="تم التحميل بواسطة بوتك @husam22227 ✅")
+            
             os.remove(file_path)
             await msg.delete()
         except Exception as e:
-            await msg.edit_text(f"خطأ: {e}")
+            await msg.edit_text(f"❌ حدث خطأ أثناء التحميل: {e}")
+    else:
+        await update.message.reply_text("عذراً، أرسل رابط تيك توك صحيح فقط.")
+
+def download_tiktok_sync(url):
+    ydl_opts = {'format': 'best', 'outtmpl': 'video_%(id)s.mp4', 'quiet': True}
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=True)
+        return ydl.prepare_filename(info)
 
 def main():
     app = Application.builder().token(TOKEN).build()
+    
+    # إضافة أمر ستارت
+    app.add_handler(CommandHandler("start", start))
+    
+    # إضافة معالج الرسائل
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    
+    print("البوت يعمل الآن...")
     app.run_polling()
 
 if __name__ == '__main__':
