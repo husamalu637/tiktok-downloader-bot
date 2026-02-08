@@ -4,11 +4,13 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 import yt_dlp
 
-# --- الإعدادات ---
+# --- الإعدادات التي طلبتها مدمجة هنا ---
 TOKEN = '8235603726:AAHA14coek5rb90rLwO80vkDAMKaId2bw0g'
 ADMIN_ID = 8596496166 
+CHANNEL_URL = 'https://t.me/husam22227'
 USERS_FILE = "users_list.txt"
 
+# وظيفة لحفظ المستخدمين لإرسال رسائل الإذاعة
 def save_user(user_id):
     if not os.path.exists(USERS_FILE):
         with open(USERS_FILE, "w") as f: f.write(f"{user_id}\n")
@@ -17,6 +19,7 @@ def save_user(user_id):
         if str(user_id) not in users:
             with open(USERS_FILE, "a") as f: f.write(f"{user_id}\n")
 
+# رسالة العودة للعمل (تُرسل تلقائياً عند تشغيل السيرفر)
 async def send_online_notice(app: Application):
     if os.path.exists(USERS_FILE):
         with open(USERS_FILE, "r") as f:
@@ -40,7 +43,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🔹 **فيس بوك** (Facebook)\n"
         "🔹 **إنستغرام** (Instagram)\n\n"
         "⚠️ **ملاحظة:** الحد الأقصى لحجم الفيديو هو 50 ميجا.\n"
-        "فقط أرسل الرابط وسأقوم بالواجب! 📥"
+        "فقط أرسل الرابط وسأقوم بالتحميل فوراً! 📥"
     )
     await update.message.reply_text(welcome_msg, parse_mode='Markdown')
 
@@ -48,7 +51,7 @@ async def download_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     save_user(user_id)
     url = update.message.text
-    status_msg = await update.message.reply_text('⏳ جاري المعالجة... انتظر قليلاً')
+    status_msg = await update.message.reply_text('⏳ جاري التحميل... انتظر قليلاً')
 
     ydl_opts = {
         'format': 'best',
@@ -68,20 +71,22 @@ async def download_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if os.path.exists(filename): os.remove(filename)
         await status_msg.delete()
     except Exception:
-        await status_msg.edit_text("❌ تعذر التحميل. تأكد من الرابط والحجم (أقل من 50 ميجا).")
+        await status_msg.edit_text("❌ تعذر التحميل. تأكد أن الرابط مدعوم والحجم أقل من 50 ميجا.")
 
 def main():
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, download_video))
 
+    # محاولة إرسال رسالة "البوت عاد للعمل" عند بدء التشغيل على Render
     try:
         loop = asyncio.get_event_loop()
         loop.create_task(send_online_notice(app))
     except: pass
 
-    print("البوت يعمل...")
+    print("البوت يعمل بنجاح...")
     app.run_polling()
 
 if __name__ == '__main__':
     main()
+    
