@@ -1,88 +1,75 @@
-import telebot
+
+Import telebot
 import yt_dlp
 import os
-from telebot import types
 
-# التوكن الخاص بك
+# توكن البوت الخاص بك
 TOKEN = '8235603726:AAHA14coek5rb90rLwO80vkDAMKaId2bw0g'
 bot = telebot.TeleBot(TOKEN)
 
-AD_LINK = "https://www.effectivegatecpm.com/xaeg3i863?key=23cf5c1f0aa47c762d8b1fc9de714230"
+# معرف القناة الخاص بك للإعلان
 CHANNEL_USER = "@husam22227"
+CHANNEL_LINK = "https://t.me/husam22227"
 
-# --- 1. معالج الأزرار (يجب أن يكون في البداية) ---
-@bot.callback_query_handler(func=lambda call: call.data == "get_vid")
-def send_the_video(call):
-    user_id = call.from_user.id
-    filename = f"video_{user_id}.mp4"
-
-    if os.path.exists(filename):
-        bot.answer_callback_query(call.id, "🚀 جاري إرسال الفيديو... انتظر قليلاً")
-        try:
-            with open(filename, 'rb') as video:
-                bot.send_video(call.message.chat.id, video, caption=f"✅ تم التحميل بنجاح!\n📢 تابعنا: {CHANNEL_USER}")
-            
-            # حذف الملف بعد الإرسال الناجح
-            os.remove(filename)
-            # حذف رسالة الأزرار لتنظيف المحادثة
-            bot.delete_message(call.message.chat.id, call.message.message_id)
-        except Exception as e:
-            bot.answer_callback_query(call.id, "❌ خطأ أثناء الإرسال.", show_alert=True)
-    else:
-        # إذا ضغط المستخدم مرتين أو الملف غير موجود
-        bot.answer_callback_query(call.id, "⚠️ الملف غير موجود أو تم إرساله مسبقاً. أرسل الرابط من جديد.", show_alert=True)
-
-# --- 2. معالج الأوامر ---
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    bot.reply_to(message, "🎬 أهلاً بك! أرسل رابط تيك توك الآن وسأقوم بتجهيزه لك.")
+    welcome_text = (
+        "🎬 **مرحباً بك في بوت تحميل تيك توك!**\n\n"
+        "🚀 أرسل رابط الفيديو الآن لتحميله بجودة عالية.\n\n"
+        f"📢 تابع جديدنا على: {CHANNEL_USER}"
+    )
+    bot.reply_to(message, welcome_text, parse_mode='Markdown')
 
-# --- 3. معالج الروابط والتحميل ---
 @bot.message_handler(func=lambda message: True)
-def handle_download(message):
+def download_tiktok(message):
     url = message.text
     user_id = message.from_user.id
     
+    # التأكد أن الرابط تيك توك
     if "tiktok.com" not in url:
-        bot.reply_to(message, "❌ نعتذر، الرابط يجب أن يكون من تيك توك فقط.")
+        bot.reply_to(message, f"❌ أرسل رابط تيك توك فقط.\n\nلمتابعة شروحاتنا: {CHANNEL_USER}")
         return
 
-    # حذف أي ملف قديم لهذا المستخدم لضمان عدم حدوث تداخل
-    old_file = f"video_{user_id}.mp4"
-    if os.path.exists(old_file): os.remove(old_file)
-
-    msg = bot.reply_to(message, "⏳ جاري تحميل الفيديو على سيرفراتنا...")
+    msg = bot.reply_to(message, "⏳ جاري التحميل... انتظر قليلاً")
+    
+    ydl_opts = {
+        'format': 'best',
+        'outtmpl': f'vid_{user_id}.%(ext)s',
+        'quiet': True,
+        'no_warnings': True,
+        'nocheckcertificate': True,
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+    }
 
     try:
-        ydl_opts = {
-            'format': 'best',
-            'outtmpl': old_file,
-            'quiet': True,
-            'no_warnings': True,
-        }
-
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            thumb = info.get('thumbnail', None)
+            # فحص الحجم (50 ميجا)
+            info = ydl.extract_info(url, download=False)
+            filesize = info.get('filesize', 0) or info.get('filesize_approx', 0)
+            
+            if filesize > 50 * 1024 * 1024:
+                bot.edit_message_text(f"⚠️ الفيديو ضخم جداً (أكبر من 50MB)!\n\nقناتنا: {CHANNEL_USER}", message.chat.id, msg.message_id)
+                return
 
-        # إنشاء الأزرار
-        markup = types.InlineKeyboardMarkup()
-        btn_ad = types.InlineKeyboardButton("🔓 تفعيل سيرفر التحميل (إعلان)", url=AD_LINK)
-        btn_send = types.InlineKeyboardButton("📥 استلام الفيديو الآن", callback_data="get_vid")
-        markup.add(btn_ad)
-        markup.add(btn_send)
+            ydl.download([url])
+            filename = ydl.prepare_filename(info)
 
-        # إرسال النتيجة للمستخدم
-        if thumb:
-            bot.send_photo(message.chat.id, thumb, 
-                         caption="✅ الفيديو جاهز الآن!\n\n1️⃣ اضغط على 'تفعيل السيرفر' أولاً.\n2️⃣ ثم اضغط على 'استلام الفيديو' بالأسفل.", 
-                         reply_markup=markup)
-        else:
-            bot.send_message(message.chat.id, "✅ الفيديو جاهز! اضغط على الأزرار أدناه للاستلام:", reply_markup=markup)
+        # إرسال الفيديو مع الإعلان في الوصف (Caption)
+        with open(filename, 'rb') as video:
+            caption_text = (
+                "✅ تم التحميل بنجاح!\n\n"
+                f"🚀 بواسطة: @{bot.get_me().username}\n"
+                f"📢 تابع قناتنا: {CHANNEL_USER}"
+            )
+            bot.send_video(message.chat.id, video, caption=caption_text)
         
+        # تنظيف السيرفر
+        if os.path.exists(filename):
+            os.remove(filename)
         bot.delete_message(message.chat.id, msg.message_id)
-
-    except Exception as e:
-        bot.edit_message_text(f"❌ حدث خطأ أثناء التجهيز. تأكد من أن الفيديو ليس خاصاً.", message.chat.id, msg.message_id)
+        
+    except Exception:
+        bot.edit_message_text(f"❌ فشل التحميل. تأكد من الرابط.\n\nللدعم: {CHANNEL_USER}", message.chat.id, msg.message_id)
+        if 'filename' in locals() and os.path.exists(filename): os.remove(filename)
 
 bot.infinity_polling()
