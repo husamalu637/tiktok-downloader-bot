@@ -1,5 +1,4 @@
-
-Import telebot
+import telebot
 import yt_dlp
 import os
 
@@ -43,7 +42,7 @@ def download_tiktok(message):
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # فحص الحجم (50 ميجا)
+            # استخراج المعلومات بدون تحميل أولاً لفحص الحجم
             info = ydl.extract_info(url, download=False)
             filesize = info.get('filesize', 0) or info.get('filesize_approx', 0)
             
@@ -51,6 +50,7 @@ def download_tiktok(message):
                 bot.edit_message_text(f"⚠️ الفيديو ضخم جداً (أكبر من 50MB)!\n\nقناتنا: {CHANNEL_USER}", message.chat.id, msg.message_id)
                 return
 
+            # بدء التحميل الفعلي
             ydl.download([url])
             filename = ydl.prepare_filename(info)
 
@@ -63,13 +63,16 @@ def download_tiktok(message):
             )
             bot.send_video(message.chat.id, video, caption=caption_text)
         
-        # تنظيف السيرفر
+        # تنظيف الجهاز من الفيديو بعد الإرسال
         if os.path.exists(filename):
             os.remove(filename)
         bot.delete_message(message.chat.id, msg.message_id)
         
-    except Exception:
+    except Exception as e:
         bot.edit_message_text(f"❌ فشل التحميل. تأكد من الرابط.\n\nللدعم: {CHANNEL_USER}", message.chat.id, msg.message_id)
-        if 'filename' in locals() and os.path.exists(filename): os.remove(filename)
+        # محاولة مسح الملف إذا وجد في حال حدوث خطأ
+        if 'filename' in locals() and os.path.exists(filename): 
+            os.remove(filename)
 
+print("✅ البوت يعمل الآن يا حسام.. اذهب لتجربته!")
 bot.infinity_polling()
