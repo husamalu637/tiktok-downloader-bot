@@ -1,78 +1,79 @@
 import telebot
 import yt_dlp
 import os
+import uuid
+import re
+from telebot import types
 
-# توكن البوت الخاص بك
+# التوكن الخاص بك
 TOKEN = '8235603726:AAHA14coek5rb90rLwO80vkDAMKaId2bw0g'
 bot = telebot.TeleBot(TOKEN)
 
-# معرف القناة الخاص بك للإعلان
-CHANNEL_USER = "@husam22227"
-CHANNEL_LINK = "https://t.me/husam22227"
+# رابط الإعلانات للدعم
+SUPPORT_LINK = "https://www.effectivegatecpm.com/xaeg3i863?key=23cf5c1f0aa47c762d8b1fc9de714230"
 
 @bot.message_handler(commands=['start'])
-def send_welcome(message):
-    welcome_text = (
-        "🎬 **مرحباً بك في بوت تحميل تيك توك!**\n\n"
-        "🚀 أرسل رابط الفيديو الآن لتحميله بجودة عالية.\n\n"
-        f"📢 تابع جديدنا على: {CHANNEL_USER}"
-    )
-    bot.reply_to(message, welcome_text, parse_mode='Markdown')
+def start(message):
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("☕ لدعم استمرار البوت", url=SUPPORT_LINK))
+    
+    bot.reply_to(message, 
+        "🎬 **مرحباً بك في بوت التحميل!**\n\n"
+        "🚀 **البوت يدعم التحميل من:**\n"
+        "✅ تيك توك (TikTok)\n"
+        "✅ فيسبوك (Facebook)\n\n"
+        "⚠️ **تنبيه:** الحد الأقصى للحجم هو **50 ميجا**.\n"
+        "أرسل رابط الفيديو الآن لنبدأ!", 
+        reply_markup=markup)
 
 @bot.message_handler(func=lambda message: True)
-def download_tiktok(message):
-    url = message.text
-    user_id = message.from_user.id
-    
-    # التأكد أن الرابط تيك توك
-    if "tiktok.com" not in url:
-        bot.reply_to(message, f"❌ أرسل رابط تيك توك فقط.\n\nلمتابعة شروحاتنا: {CHANNEL_USER}")
+def handle_download(message):
+    # البحث عن الرابط
+    url_match = re.search(r'(https?://[^\s]+)', message.text)
+    if not url_match:
         return
 
-    msg = bot.reply_to(message, "⏳ جاري التحميل... انتظر قليلاً")
+    url = url_match.group(0)
+    
+    # حصر المنصات في تيك توك وفيسبوك فقط
+    supported = ["tiktok.com", "facebook.com", "fb.watch", "fb.com"]
+    
+    if not any(x in url for x in supported):
+        bot.reply_to(message, "❌ **عذراً!** هذا البوت يدعم التحميل من (تيك توك وفيسبوك) فقط.")
+        return
+
+    msg = bot.reply_to(message, "⏳ جاري التحميل من المنصة المطلوبة...\n(تذكر: الحد الأقصى 50MB)")
+    
+    filename = f'vid_{uuid.uuid4().hex[:8]}.mp4'
     
     ydl_opts = {
         'format': 'best',
-        'outtmpl': f'vid_{user_id}.%(ext)s',
+        'outtmpl': filename,
         'quiet': True,
-        'no_warnings': True,
-        'nocheckcertificate': True,
-        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+        'max_filesize': 52428800, # 50MB
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # استخراج المعلومات بدون تحميل أولاً لفحص الحجم
-            info = ydl.extract_info(url, download=False)
-            filesize = info.get('filesize', 0) or info.get('filesize_approx', 0)
-            
-            if filesize > 50 * 1024 * 1024:
-                bot.edit_message_text(f"⚠️ الفيديو ضخم جداً (أكبر من 50MB)!\n\nقناتنا: {CHANNEL_USER}", message.chat.id, msg.message_id)
-                return
-
-            # بدء التحميل الفعلي
             ydl.download([url])
-            filename = ydl.prepare_filename(info)
-
-        # إرسال الفيديو مع الإعلان في الوصف (Caption)
-        with open(filename, 'rb') as video:
-            caption_text = (
-                "✅ تم التحميل بنجاح!\n\n"
-                f"🚀 بواسطة: @{bot.get_me().username}\n"
-                f"📢 تابع قناتنا: {CHANNEL_USER}"
-            )
-            bot.send_video(message.chat.id, video, caption=caption_text)
         
-        # تنظيف الجهاز من الفيديو بعد الإرسال
+        if os.path.exists(filename):
+            with open(filename, 'rb') as video:
+                markup = types.InlineKeyboardMarkup()
+                markup.add(types.InlineKeyboardButton("☕ دعم البوت", url=SUPPORT_LINK))
+                bot.send_video(message.chat.id, video, caption="✅ تم التحميل بنجاح!", reply_markup=markup)
+            bot.delete_message(message.chat.id, msg.message_id)
+        else:
+            bot.edit_message_text("❌ الفيديو أكبر من 50 ميجا.", message.chat.id, msg.message_id)
+            
+    except Exception:
+        bot.edit_message_text("❌ حدث خطأ! تأكد أن الرابط عام وليس خاصاً.", message.chat.id, msg.message_id)
+    
+    finally:
         if os.path.exists(filename):
             os.remove(filename)
-        bot.delete_message(message.chat.id, msg.message_id)
-        
-    except Exception as e:
-        bot.edit_message_text(f"❌ فشل التحميل. تأكد من الرابط.\n\nللدعم: {CHANNEL_USER}", message.chat.id, msg.message_id)
-        # محاولة مسح الملف إذا وجد في حال حدوث خطأ
-        if 'filename' in locals() and os.path.exists(filename): 
-            os.remove(filename)
 
-print("✅ البوت يعمل الآن يا حسام.. اذهب لتجربته!")
+# تنظيف الجلسات والبدء
+bot.delete_webhook()
+print("🚀 البوت يعمل الآن (تيك توك + فيسبوك)...")
 bot.infinity_polling()
