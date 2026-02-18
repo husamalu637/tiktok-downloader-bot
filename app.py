@@ -1,4 +1,4 @@
-import telebot
+Import telebot
 import yt_dlp
 import os
 import uuid
@@ -9,6 +9,7 @@ from telebot import types
 TOKEN = '8235603726:AAHA14coek5rb90rLwO80vkDAMKaId2bw0g'
 bot = telebot.TeleBot(TOKEN)
 
+# رابط الإعلانات للدعم
 SUPPORT_LINK = "https://www.effectivegatecpm.com/xaeg3i863?key=23cf5c1f0aa47c762d8b1fc9de714230"
 
 @bot.message_handler(commands=['start'])
@@ -17,31 +18,39 @@ def start(message):
     markup.add(types.InlineKeyboardButton("☕ لدعم استمرار البوت", url=SUPPORT_LINK))
     
     bot.reply_to(message, 
-        "🎬 **مرحباً بك في بوت التحميل الشامل!**\n\n"
-        "🚀 **يدعم الآن:**\n"
-        "✅ يوتيوب و إنستغرام\n"
-        "✅ تيك توك و فيسبوك\n\n"
-        "أرسل الرابط وسأقوم بالتحميل فوراً!", 
+        "🎬 **مرحباً بك في بوت التحميل!**\n\n"
+        "🚀 **البوت يدعم التحميل من:**\n"
+        "✅ تيك توك (TikTok)\n"
+        "✅ فيسبوك (Facebook)\n\n"
+        "⚠️ **تنبيه:** الحد الأقصى للحجم هو **50 ميجا**.\n"
+        "أرسل رابط الفيديو الآن لنبدأ!", 
         reply_markup=markup)
 
 @bot.message_handler(func=lambda message: True)
 def handle_download(message):
+    # البحث عن الرابط
     url_match = re.search(r'(https?://[^\s]+)', message.text)
-    if not url_match: return
+    if not url_match:
+        return
 
     url = url_match.group(0)
-    msg = bot.reply_to(message, "⏳ جاري التحميل... يرجى الانتظار.")
+    
+    # حصر المنصات في تيك توك وفيسبوك فقط
+    supported = ["tiktok.com", "facebook.com", "fb.watch", "fb.com"]
+    
+    if not any(x in url for x in supported):
+        bot.reply_to(message, "❌ **عذراً!** هذا البوت يدعم التحميل من (تيك توك وفيسبوك) فقط.")
+        return
+
+    msg = bot.reply_to(message, "⏳ جاري التحميل من المنصة المطلوبة...\n(تذكر: الحد الأقصى 50MB)")
     
     filename = f'vid_{uuid.uuid4().hex[:8]}.mp4'
     
     ydl_opts = {
-        # 'best' هي الأضمن للعمل على Koyeb لتجنب مشاكل المعالجة الثقيلة
-        'format': 'best[ext=mp4]/best',
+        'format': 'best',
         'outtmpl': filename,
         'quiet': True,
-        'no_warnings': True,
-        'max_filesize': 50 * 1024 * 1024, # 50MB
-        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36'
+        'max_filesize': 52428800, # 50MB
     }
 
     try:
@@ -50,20 +59,21 @@ def handle_download(message):
         
         if os.path.exists(filename):
             with open(filename, 'rb') as video:
-                bot.send_video(message.chat.id, video, caption="✅ تم التحميل بنجاح!")
+                markup = types.InlineKeyboardMarkup()
+                markup.add(types.InlineKeyboardButton("☕ دعم البوت", url=SUPPORT_LINK))
+                bot.send_video(message.chat.id, video, caption="✅ تم التحميل بنجاح!", reply_markup=markup)
             bot.delete_message(message.chat.id, msg.message_id)
         else:
-            bot.edit_message_text("❌ لم أتمكن من العثور على الفيديو، قد يكون خاصاً أو كبيراً جداً.", message.chat.id, msg.message_id)
+            bot.edit_message_text("❌ الفيديو أكبر من 50 ميجا.", message.chat.id, msg.message_id)
             
-    except Exception as e:
-        bot.edit_message_text(f"❌ حدث خطأ أثناء التحميل. تأكد من صحة الرابط.", message.chat.id, msg.message_id)
+    except Exception:
+        bot.edit_message_text("❌ حدث خطأ! تأكد أن الرابط عام وليس خاصاً.", message.chat.id, msg.message_id)
     
     finally:
         if os.path.exists(filename):
             os.remove(filename)
 
-# تشغيل البوت بنظام لا يتوقف
-if __name__ == '__main__':
-    print("🚀 البوت يعمل الآن على Koyeb...")
-    bot.infinity_polling(timeout=10, long_polling_timeout=5)
-    
+# تنظيف الجلسات والبدء
+bot.delete_webhook()
+print("🚀 البوت يعمل الآن (تيك توك + فيسبوك)...")
+bot.infinity_polling()
