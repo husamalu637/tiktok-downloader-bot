@@ -1,4 +1,4 @@
-Import telebot
+import telebot
 import yt_dlp
 import os
 import uuid
