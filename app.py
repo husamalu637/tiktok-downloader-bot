@@ -1,6 +1,9 @@
+import os
+# --- الميزة 1: تحديث المكتبة تلقائياً عند التشغيل على السيرفر لضمان عمل يوتيوب ---
+os.system("pip install -U yt-dlp")
+
 import telebot
 import yt_dlp
-import os
 import uuid
 import re
 from telebot import types
@@ -18,8 +21,10 @@ def start(message):
     markup.add(types.InlineKeyboardButton("☕ لدعم استمرار البوت", url=SUPPORT_LINK))
     
     bot.reply_to(message, 
-        "🎬 **مرحباً بك في بوت التحميل!**\n\n"
+        "🎬 **مرحباً بك في بوت التحميل المطور!**\n\n"
         "🚀 **البوت يدعم التحميل من:**\n"
+        "✅ يوتيوب (YouTube)\n"
+        "✅ إنستغرام (Instagram)\n"
         "✅ تيك توك (TikTok)\n"
         "✅ فيسبوك (Facebook)\n\n"
         "⚠️ **تنبيه:** الحد الأقصى للحجم هو **50 ميجا**.\n"
@@ -35,22 +40,25 @@ def handle_download(message):
 
     url = url_match.group(0)
     
-    # حصر المنصات في تيك توك وفيسبوك فقط
-    supported = ["tiktok.com", "facebook.com", "fb.watch", "fb.com"]
+    # --- الميزة 2: تم تعديل القائمة المسموحة لتشمل يوتيوب وإنستغرام ---
+    supported = ["tiktok.com", "facebook.com", "fb.watch", "fb.com", "youtube.com", "youtu.be", "instagram.com"]
     
     if not any(x in url for x in supported):
-        bot.reply_to(message, "❌ **عذراً!** هذا البوت يدعم التحميل من (تيك توك وفيسبوك) فقط.")
+        bot.reply_to(message, "❌ **عذراً!** هذا البوت يدعم التحميل من (يوتيوب، إنستغرام، تيك توك، فيسبوك) فقط.")
         return
 
-    msg = bot.reply_to(message, "⏳ جاري التحميل من المنصة المطلوبة...\n(تذكر: الحد الأقصى 50MB)")
+    msg = bot.reply_to(message, "⏳ جاري التحميل ومعالجة الرابط...\n(تذكر: الحد الأقصى 50MB)")
     
     filename = f'vid_{uuid.uuid4().hex[:8]}.mp4'
     
+    # --- الميزة 3: تطوير إعدادات التحميل لضمان دمج الصوت والصورة وتخطي الحماية ---
     ydl_opts = {
-        'format': 'best',
+        'format': 'best[ext=mp4]/best', # اختيار أفضل جودة بصيغة mp4 لضمان عمل الصوت
         'outtmpl': filename,
         'quiet': True,
         'max_filesize': 52428800, # 50MB
+        'no_warnings': True,
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
     }
 
     try:
@@ -64,9 +72,11 @@ def handle_download(message):
                 bot.send_video(message.chat.id, video, caption="✅ تم التحميل بنجاح!", reply_markup=markup)
             bot.delete_message(message.chat.id, msg.message_id)
         else:
-            bot.edit_message_text("❌ الفيديو أكبر من 50 ميجا.", message.chat.id, msg.message_id)
+            bot.edit_message_text("❌ الفيديو أكبر من 50 ميجا أو لم يتم العثور عليه.", message.chat.id, msg.message_id)
             
-    except Exception:
+    except Exception as e:
+        # طباعة الخطأ في الكونسول للمطور للمساعدة في التشخيص
+        print(f"Error: {e}")
         bot.edit_message_text("❌ حدث خطأ! تأكد أن الرابط عام وليس خاصاً.", message.chat.id, msg.message_id)
     
     finally:
@@ -75,5 +85,5 @@ def handle_download(message):
 
 # تنظيف الجلسات والبدء
 bot.delete_webhook()
-print("🚀 البوت يعمل الآن (تيك توك + فيسبوك)...")
+print("🚀 البوت يعمل الآن (YouTube + Instagram + TikTok + Facebook)...")
 bot.infinity_polling()
